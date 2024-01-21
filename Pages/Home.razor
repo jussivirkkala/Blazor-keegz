@@ -1,0 +1,178 @@
+﻿@page "/"
+@using System.IO
+@using System.IO.Compression
+@using System.Xml
+@using System.Text
+
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Home</PageTitle>
+@*  @jussivirkkala
+    Displaying stratuseeg.com keegz file content
+    2024-01-21 First published version
+    2024-01-20 Based on https://github.com/jussivirkkala/Stratus-keegz
+*@
+
+<div @ref="fileDropContainer">
+Drop or <InputFile id="inputDefault" OnChange="OnFileSelection" accept=".keegz, .xml" />
+</div>
+
+
+@if (@filename!=null)
+{
+    <p>Filename:
+    @filename
+    </p>
+}
+
+@if (@rows!= null)
+{
+    <br>@rows
+}
+
+<table>
+    @if (@fields.Count > 0)
+    {
+        <tr>
+            <th></th>
+        </tr>
+        foreach (var row in fields)
+        {
+            <tr>
+                <td>@row</td>
+            </tr>
+        }
+}
+</table>
+
+<table>
+@if (@archive != null)
+{
+    <tr>
+    <th>Files in keegz</th>
+    <th>Size</th>
+    <th>Modified</th>
+    </tr>
+    foreach (ZipArchiveEntry entry in archive.Entries)
+    {
+        <tr>
+            <td>@entry.FullName</td>
+            <td>@entry.Length</td>
+            <td>@entry.LastWriteTime.ToLocalTime().ToString()</td>
+        </tr>
+    }
+}
+</table>
+
+<br>
+2024-01-21 Displaying <a href="https://www.stratuseeg.com" www.stratuseeg.com</a> .keegz or StaticInfo.xml selected content. File is analyzed locally.
+App is hosted on <a href="https://jussivirkkala.github.io/Blazor-keegz" jussivirkkala.github.io/Blazor-keegz/</a> and
+source code in <a href="https://github.com/jussivirkkala/Blazor-keegz" github.com/jussivirkkala/Blazor-keegz</a>
+<br>
+
+@code {
+    private List<String> fields= new List<String>();
+    ElementReference fileDropContainer;
+
+    private string filename;
+    private string rows;
+    private ZipArchive archive;
+
+    private async Task OnFileSelection(InputFileChangeEventArgs e)
+    {
+        fields.Clear();
+        archive = null;
+        filename = e.File.Name;
+        if (!filename.EndsWith("StaticInfo.xml") & !filename.EndsWith(".keegz"))
+        {
+            filename=("File should be .keegz or StaticInfo.xml");
+            return;
+        }
+
+        string s = "";
+        const long MAXSIZE = 4294967296; 
+        await using var stream = e.File.OpenReadStream(MAXSIZE);
+
+        if (filename.Equals("StaticInfo.xml"))
+        {
+            using (var streamReader = new StreamReader(stream))
+                s = await streamReader.ReadToEndAsync();            
+        }
+        else
+        {
+
+            // https://plbonneville.com/blog/listing-zip-file-content-in-blazor/
+            await using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            archive = new ZipArchive(ms);
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                if (entry.FullName.Equals("StaticInfo.xml"))
+                {
+                    var sr = new StreamReader(entry.Open());
+                    s = sr.ReadToEnd();
+                }
+            }
+        }
+
+        if (s.Length == 0)
+        {
+            rows="No StaticInfo.xml";
+            return;
+        }
+        XmlDocument doc = null;
+        try
+        {
+            doc = new XmlDocument();
+            doc.LoadXml(s);
+        }
+        catch
+        {
+            rows="Error reading XLM";
+            return;
+        }
+
+        fields.Add("Patient:");
+        fields.Add(Entry(doc, "Id", "Patient"));
+        fields.Add(Entry(doc, "LastName", "Patient"));
+        fields.Add(Entry(doc, "FirstName", "Patient"));
+        fields.Add(Entry(doc, "MiddleNames", "Patient"));
+        fields.Add(Entry(doc, "DateOfBirth", "Patient"));
+        fields.Add(Entry(doc, "GestationalAge", "Patient"));
+        fields.Add(Entry(doc, "GenderMale", "Patient"));
+        fields.Add(Entry(doc, "Notes", "Patient"));
+        fields.Add(Entry(doc, "PatientHistory", "Patient"));
+        fields.Add(Entry(doc, "SocialSecurityNumber", "Patient"));
+
+        fields.Add("Exam:");
+        fields.Add(Entry(doc, "RecordedDate", "Exam"));
+        fields.Add(Entry(doc, "Id", "Exam"));
+        fields.Add(Entry(doc, "Anesthesiologist", "Exam"));
+        fields.Add(Entry(doc, "ClinicalReason", "Exam"));
+        fields.Add(Entry(doc, "Diagnosis", "Exam"));
+        fields.Add(Entry(doc, "Medication", "Exam"));
+        fields.Add(Entry(doc, "Notes", "Exam"));
+        fields.Add(Entry(doc, "PatientState", "Exam"));
+        fields.Add(Entry(doc, "Neurophysiologist", "Exam"));
+        fields.Add(Entry(doc, "Physician", "Exam"));
+        fields.Add(Entry(doc, "RequestedBy", "Exam"));
+        fields.Add(Entry(doc, "Secretary", "Exam"));
+        fields.Add(Entry(doc, "Surgeon", "Exam"));
+        fields.Add("Visit:");
+        fields.Add(Entry(doc, "Height", "Visit"));
+        fields.Add(Entry(doc, "Weight", "Visit"));
+    }
+
+    // Find certain element
+    static string Entry(XmlDocument doc, string header, string group)
+    {
+        string r = "";
+        XmlNodeList elemList = doc.GetElementsByTagName("a:" + header);
+        for (int i = 0; i < elemList.Count; i++)
+        {
+            if (elemList[i].ParentNode.Name.Equals(group))
+                r += header + ": " + elemList[i].InnerXml;
+        }
+        return r;
+    }
+}
