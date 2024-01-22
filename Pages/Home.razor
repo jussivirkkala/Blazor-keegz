@@ -20,14 +20,12 @@ Drop or <InputFile id="inputDefault" OnChange="OnFileSelection" accept=".keegz, 
 
 @if (@filename!=null)
 {
-    <p>Filename:
-    @filename
-    </p>
+    <p>Filename: @filename</p>
 }
 
 @if (@rows!= null)
 {
-    <br>@rows
+    @rows
 }
 
 <table>
@@ -65,7 +63,7 @@ Drop or <InputFile id="inputDefault" OnChange="OnFileSelection" accept=".keegz, 
 </table>
 
 <br>
-2024-01-21 Displaying <a href="https://www.stratuseeg.com"> www.stratuseeg.com</a> .keegz or StaticInfo.xml selected content. File is analyzed locally. 
+2024-01-22 Displaying <a href="https://www.stratuseeg.com"> www.stratuseeg.com</a> .keegz or StaticInfo.xml selected content. File is analyzed locally. 
 App is hosted on <a href="https://jussivirkkala.github.io/Blazor-keegz">jussivirkkala.github.io/Blazor-keegz/</a> 
 and source code in <a href="https://github.com/jussivirkkala/Blazor-keegz">github.com/jussivirkkala/Blazor-keegz</a>
 <br>
@@ -91,27 +89,47 @@ and source code in <a href="https://github.com/jussivirkkala/Blazor-keegz">githu
 
         string s = "";
         const long MAXSIZE = 4294967296; 
+
+        if (e.File.Size>MAXSIZE)
+        {
+            rows = "Too large file";
+            return;
+        }
+
         await using var stream = e.File.OpenReadStream(MAXSIZE);
 
         if (filename.Equals("StaticInfo.xml"))
         {
             using (var streamReader = new StreamReader(stream))
-                s = await streamReader.ReadToEndAsync();            
+                s = await streamReader.ReadToEndAsync();       
         }
         else
         {
+            // ZipFile.OpenRead(stream);
 
-            // https://plbonneville.com/blog/listing-zip-file-content-in-blazor/
-            await using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-            archive = new ZipArchive(ms);
-            foreach (ZipArchiveEntry entry in archive.Entries)
+
+            try {
+                // https://plbonneville.com/blog/listing-zip-file-content-in-blazor/
+                await using var ms = new MemoryStream();
+
+                await stream.CopyToAsync(ms);
+
+       
+
+                archive = new ZipArchive(ms);
+                foreach (ZipArchiveEntry entry in archive.Entries)
+                     {
+                         if (entry.FullName.Equals("StaticInfo.xml"))
+                         {
+                             var sr = new StreamReader(entry.Open());
+                             s = sr.ReadToEnd();
+                         }
+                    }
+            }
+            catch
             {
-                if (entry.FullName.Equals("StaticInfo.xml"))
-                {
-                    var sr = new StreamReader(entry.Open());
-                    s = sr.ReadToEnd();
-                }
+                rows = "Out of memory";
+                return;
             }
         }
 
