@@ -9,6 +9,7 @@
 <PageTitle>Home</PageTitle>
 @*  @jussivirkkala
     Displaying stratuseeg.com keegz file content
+    2024-01-22 Displaying out of memory
     2024-01-21 First published version
     2024-01-20 Based on https://github.com/jussivirkkala/Stratus-keegz
 *@
@@ -80,6 +81,7 @@ and source code in <a href="https://github.com/jussivirkkala/Blazor-keegz">githu
     {
         fields.Clear();
         archive = null;
+        rows = "";
         filename = e.File.Name;
         if (!filename.EndsWith("StaticInfo.xml") & !filename.EndsWith(".keegz"))
         {
@@ -105,7 +107,7 @@ and source code in <a href="https://github.com/jussivirkkala/Blazor-keegz">githu
         }
         else
         {
-            // ZipFile.OpenRead(stream);
+       
 
 
             try {
